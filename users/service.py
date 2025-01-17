@@ -4,22 +4,20 @@ from sqlalchemy import select
 from models.models import User
 from database import SessionDep
 from fastapi import HTTPException
-from dotenv import dotenv_values
+import config
 import hashlib
 
 
 class UsersService:
-    def __init__(self):
-        self.__SECRET: str = dotenv_values(".env")["SECRET"]  # pyright:ignore
-        if self.__SECRET is None:
-            raise ValueError()
-        self.__ALGORITHM = "HS256"
+    def hash_password(self, password: bytes) -> str:
+        hashed_password = hashlib.sha256(password).hexdigest()
+        return hashed_password
 
     async def registration(
         self, user_data: dict[str, str], session: SessionDep
-    ) -> tuple[str, str, int]:
+    ) -> tuple[str, str]:
         password = user_data["password"].encode("utf-8")
-        hashed_password = hashlib.sha256(password).hexdigest()
+        hashed_password = self.hash_password(password)
         query = User(
             username=user_data["username"],
             email=user_data["email"],
@@ -32,7 +30,7 @@ class UsersService:
         if user:
             access_token = self.generate_access_token({"user": user.id})
             refresh_token = self.generate_refresh_token({"user": user.id})
-            return access_token, refresh_token, user.id
+            return access_token, refresh_token
         raise HTTPException(status_code=404, detail="error with registration")
 
     def generate_access_token(self, payload: dict[str, int]) -> str:
@@ -40,7 +38,7 @@ class UsersService:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
         jwt_payload.update({"exp": int(expire.timestamp())})
         encoded_jwt: str = jwt.encode(
-            jwt_payload, self.__SECRET, algorithm=self.__ALGORITHM
+            jwt_payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM
         )
         return encoded_jwt
 
@@ -49,10 +47,15 @@ class UsersService:
         expire = datetime.now(timezone.utc) + timedelta(days=15)
         jwt_payload.update({"exp": int(expire.timestamp())})
         encoded_jwt: str = jwt.encode(
-            jwt_payload, self.__SECRET, algorithm=self.__ALGORITHM
+            jwt_payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM
         )
         return encoded_jwt
 
-    def verify_token(self, token: str) -> dict[str, str | int]:
-        payload = jwt.decode(token, self.__SECRET, algorithms=[self.__ALGORITHM])
-        return payload
+    def verify_token(self, token: str) -> int | None:
+        payload = jwt.decode(
+            token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM]
+        )
+        user_id = payload.get("user")
+        if user_id:
+            return user_id
+        return False

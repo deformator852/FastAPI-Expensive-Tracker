@@ -1,35 +1,48 @@
 from fastapi import APIRouter, Depends, HTTPException
 from categories.service import CategoriesService
 from database import SessionDep
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from schemas.user import CreateCategory
+from users.service import UsersService
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+router = APIRouter(tags=["Routers"])
+service = CategoriesService()
+user_service = UsersService()
+security = HTTPBearer()
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    token = token.split(" ")[1]
-    payload = jwt.decode(token, "SADSADADADADDADSADMASDA", algorithms=["HS256"])
-    user_id = payload.get("user")
+def get_current_user(authorization: HTTPAuthorizationCredentials = Depends(security)):
+    token = authorization.credentials
+    user_id = user_service.verify_token(token)
     if user_id is None:
         raise HTTPException(status_code=403, detail="Could not validate credentials")
     return user_id
 
 
-router = APIRouter(tags=["Routers"])
-service = CategoriesService()
-
-
 @router.get("/categories")
 async def get_categories(
-    session: SessionDep, current_user: str = Depends(get_current_user)
+    session: SessionDep, current_user: int = Depends(get_current_user)
 ):
-    return {"status": "GOOD"}
+    try:
+        categories = await service.get_categories(current_user, session)
+        return {"status": True, "categories": categories}
+    except Exception as e:
+        return HTTPException(404, f"Can't get categories.{e}")
 
 
 @router.post("/categories")
-async def create_category(session: SessionDep):
-    pass
+async def create_category(
+    category_data: CreateCategory,
+    session: SessionDep,
+    current_user: int = Depends(get_current_user),
+):
+    try:
+        data = category_data.model_dump()
+        category_name = data["category_name"]
+        await service.create_category(current_user, category_name, session)
+        return {"status": True}
+    except Exception as e:
+        raise HTTPException(404, f"Can't create category.E{str(e)}")
 
 
 @router.put("/categories/{cat_id}")
