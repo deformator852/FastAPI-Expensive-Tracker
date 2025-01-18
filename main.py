@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from database import setup_database
 from users.controller import router as users_router
 from categories.controller import router as categories_router
+from expenses.controller import router as expenses_router
 import uvicorn
 import asyncio
 
@@ -11,6 +12,7 @@ app = FastAPI()
 PREFIX = "/api"
 app.include_router(router=users_router, prefix=PREFIX)
 app.include_router(router=categories_router, prefix=PREFIX)
+app.include_router(router=expenses_router, prefix=PREFIX)
 
 
 async def main():

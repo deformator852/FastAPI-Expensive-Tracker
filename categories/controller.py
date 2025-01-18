@@ -1,22 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException
 from categories.service import CategoriesService
 from database import SessionDep
-from schemas.user import CreateCategory
+from schemas.category import CreateCategory, UpdateCategory
 from users.service import UsersService
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from utilities.current_user import get_current_user
 
 router = APIRouter(tags=["Routers"])
 service = CategoriesService()
 user_service = UsersService()
-security = HTTPBearer()
 
 
-def get_current_user(authorization: HTTPAuthorizationCredentials = Depends(security)):
-    token = authorization.credentials
-    user_id = user_service.verify_token(token)
-    if user_id is None:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    return user_id
+@router.get("/categories/{cat_id}")
+async def get_category(
+    cat_id: int, session: SessionDep, current_user: int = Depends(get_current_user)
+):
+    try:
+        category = await service.get_category(current_user, cat_id, session)
+        return {"status": True, "category": category}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
 
 
 @router.get("/categories")
@@ -26,8 +30,10 @@ async def get_categories(
     try:
         categories = await service.get_categories(current_user, session)
         return {"status": True, "categories": categories}
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        return HTTPException(404, f"Can't get categories.{e}")
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
 
 
 @router.post("/categories")
@@ -41,15 +47,40 @@ async def create_category(
         category_name = data["category_name"]
         await service.create_category(current_user, category_name, session)
         return {"status": True}
+
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        raise HTTPException(404, f"Can't create category.E{str(e)}")
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
 
 
 @router.put("/categories/{cat_id}")
-async def update_category(cat_id: int, session: SessionDep):
-    pass
+async def update_category(
+    cat_id: int,
+    update_data: UpdateCategory,
+    session: SessionDep,
+    current_user: int = Depends(get_current_user),
+):
+    data = update_data.model_dump()
+    try:
+        await service.update_category(
+            current_user, data["category_name"], cat_id, session
+        )
+        return {"status": True}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
 
 
 @router.delete("/categories/{cat_id}")
-async def delete_category(cat_id: int, session: SessionDep):
-    pass
+async def delete_category(
+    cat_id: int, session: SessionDep, current_user: int = Depends(get_current_user)
+):
+    try:
+        await service.delete_category(current_user, cat_id, session)
+        return {"status": True}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
