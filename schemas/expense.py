@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -10,6 +11,6 @@ class CreateExpense(BaseModel):
 
 
 class UpdateExpense(BaseModel):
-    name: str | None = Field(max_length=255)
-    amount: float | None = None
-    date_expense: datetime.datetime | None = None
+    name: Optional[str] = Field(None, max_length=255)
+    amount: Optional[float] = None
+    date_expense: Optional[datetime.datetime] = None

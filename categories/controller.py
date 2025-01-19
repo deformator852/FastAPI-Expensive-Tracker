@@ -5,7 +5,7 @@ from schemas.category import CreateCategory, UpdateCategory
 from users.service import UsersService
 from utilities.current_user import get_current_user
 
-router = APIRouter(tags=["Routers"])
+router = APIRouter(tags=["Categories"])
 service = CategoriesService()
 user_service = UsersService()
 
