@@ -9,15 +9,27 @@ router = APIRouter(tags=["Reports"])
 service = ReportsService()
 
 
+@router.get("/reports/weekly")
+async def get_expenses_weekly(
+    session: SessionDep, current_user: int = Depends(get_current_user)
+):
+    try:
+        report = await service.get_report_for_week(session, current_user)
+        return {"status": True, "report": report}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(500, f"an unexpected error occured.{str(e)}")
+
+
 @router.get("/reports/category/{cat_id}")
 async def get_expenses_by_category(
     cat_id: int, session: SessionDep, current_user: int = Depends(get_current_user)
 ):
     try:
-        expenses_by_category = await service.get_expenses_by_category(
-            session, current_user, cat_id
-        )
-        return {"status": True, "report": expenses_by_category}
+        report = await service.get_report_by_category(session, current_user, cat_id)
+        return {"status": True, "report": report}
     except HTTPException as e:
         raise e
     except Exception as e:

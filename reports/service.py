@@ -1,17 +1,61 @@
-from sqlalchemy import func, label, select
+from datetime import datetime, timedelta
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.models import Category, Expense
 
 
 class ReportsService:
-    async def get_expenses_by_category(
+    async def get_report_for_week(self, session: AsyncSession, user_id: int):
+        categories_query = (
+            select(Expense.category_id)
+            .where(Expense.user_id == user_id)
+            .group_by(Expense.category_id)
+        )
+        result = await session.execute(categories_query)
+        categories = result.fetchall()
+        data_for_user = []
+        current_date = datetime.now().replace(tzinfo=None)
+        week = current_date - timedelta(weeks=1)
+        week = week.replace(tzinfo=None)
+        for category in categories:
+            query = (
+                select(
+                    Category.category_name.label("category_name"),
+                    func.max(Expense.amount),
+                    func.min(Expense.amount),
+                    func.sum(Expense.amount),
+                    func.count(Expense.id),
+                )
+                .filter(
+                    Expense.user_id == user_id,
+                    Expense.category_id == category[0],
+                    Expense.updated_at.between(week, current_date),
+                )
+                .group_by(Category.category_name)
+                .join(Category, Category.id == Expense.category_id)
+            )
+            result = await session.execute(query)
+            expensies_by_category = result.fetchall()
+            for expense in expensies_by_category:
+                data_for_user.append(
+                    {
+                        "category_name": expense[0],
+                        "max_expense": expense[1],
+                        "min_expense": expense[2],
+                        "summary": expense[3],
+                        "expenses_count": expense[4],
+                    }
+                )
+        return data_for_user
+
+    async def get_report_by_category(
         self, session: AsyncSession, user_id: int, category_id: int
     ):
         query = (
             select(
                 Category.category_name.label("category_name"),
-                func.sum(Expense.amount).label("total_amount"),
+                func.sum(Expense.amount).label("summary"),
                 func.count(Expense.id).label("expenses_count"),
                 func.max(Expense.amount).label("max_expense"),
                 select(Expense.id)
@@ -38,20 +82,12 @@ class ReportsService:
         )
         result = await session.execute(query)
         report = result.fetchone()
-        summary_report = {
-            "category_name": "",
-            "total_amount": 0,
-            "expenses_count": 0,
-            "max_expense": 0,
-            "max_expense_id": 0,
-            "min_expense": 0,
-            "min_expense_id": 0,
-        }
+        summary_report = {}
         if not report:
-            return summary_report
+            return {}
         report = report.tuple()
         summary_report["category_name"] = report[0]
-        summary_report["total_amount"] = report[1]
+        summary_report["summary"] = report[1]
         summary_report["expenses_count"] = report[2]
         summary_report["max_expense"] = report[3]
         summary_report["max_expense_id"] = report[4]
