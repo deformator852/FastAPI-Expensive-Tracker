@@ -70,23 +70,23 @@ class ReportsService:
                 func.sum(Expense.amount).label("summary"),
                 func.count(Expense.id).label("expenses_count"),
                 func.max(Expense.amount).label("max_expense"),
-                select(Expense.id)
+                select(Expense.name)
                 .where(
                     Expense.user_id == user_id,
                     Expense.category_id == category_id,
                 )
                 .order_by(Expense.amount.desc())
                 .limit(1)
-                .label("max_expense_id"),
+                .label("max_expense_name"),
                 func.min(Expense.amount).label("min_expense"),
-                select(Expense.id)
+                select(Expense.name)
                 .where(
                     Expense.user_id == user_id,
                     Expense.category_id == category_id,
                 )
                 .order_by(Expense.amount)
                 .limit(1)
-                .label("min_expense_id"),
+                .label("min_expense_name"),
             )
             .join(Category, Category.id == Expense.category_id)
             .where(Expense.user_id == user_id, Expense.category_id == category_id)
@@ -102,7 +102,7 @@ class ReportsService:
         summary_report["summary"] = report[1]
         summary_report["expenses_count"] = report[2]
         summary_report["max_expense"] = report[3]
-        summary_report["max_expense_id"] = report[4]
+        summary_report["max_expense_name"] = report[4]
         summary_report["min_expense"] = report[5]
-        summary_report["min_expense_id"] = report[6]
+        summary_report["min_expense_name"] = report[6]
         return summary_report
