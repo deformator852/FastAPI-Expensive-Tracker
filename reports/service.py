@@ -1,12 +1,24 @@
+import csv
 from datetime import datetime, timedelta
+from io import StringIO
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.models import Category, Expense
 
 
 class ReportsService:
-    async def get_report_for_week(self, session: AsyncSession, user_id: int):
+    def write_report_in_csv(self, report: list):
+        output = StringIO()
+        writer = csv.DictWriter(
+            output,
+            fieldnames=list(report[0].keys()),
+        )
+        writer.writeheader()
+        writer.writerows(report)
+        output.seek(0)
+        return output
+
+    async def get_report(self, session: AsyncSession, user_id: int, **time_period):
         categories_query = (
             select(Expense.category_id)
             .where(Expense.user_id == user_id)
@@ -16,8 +28,8 @@ class ReportsService:
         categories = result.fetchall()
         data_for_user = []
         current_date = datetime.now().replace(tzinfo=None)
-        week = current_date - timedelta(weeks=1)
-        week = week.replace(tzinfo=None)
+        date = current_date - timedelta(**time_period)
+        date = date.replace(tzinfo=None)
         for category in categories:
             query = (
                 select(
@@ -30,7 +42,7 @@ class ReportsService:
                 .filter(
                     Expense.user_id == user_id,
                     Expense.category_id == category[0],
-                    Expense.updated_at.between(week, current_date),
+                    Expense.date_expense.between(date, current_date),
                 )
                 .group_by(Category.category_name)
                 .join(Category, Category.id == Expense.category_id)
